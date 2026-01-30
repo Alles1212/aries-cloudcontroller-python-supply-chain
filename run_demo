@@ -1,0 +1,244 @@
+#!/bin/bash
+
+# Aries CloudController Python Demo - Run Script
+# 啟動 Faber-Alice-Acme SSI 供應鏈系統
+
+set -e
+
+# 顏色輸出
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+function print_header() {
+    echo -e "${GREEN}"
+    echo "╔════════════════════════════════════════════════════════════╗"
+    echo "║   Aries CloudController Python Demo                       ║"
+    echo "║   Faber-Alice-Acme SSI Supply Chain System                ║"
+    echo "╚════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+}
+
+function check_prerequisites() {
+    echo -e "${YELLOW}Checking prerequisites...${NC}"
+    
+    # 檢查 Docker
+    if ! command -v docker &> /dev/null; then
+        echo -e "${RED}Error: Docker is not installed${NC}"
+        exit 1
+    fi
+    
+    # 檢查 Docker Compose
+    if ! command -v docker-compose &> /dev/null; then
+        echo -e "${RED}Error: Docker Compose is not installed${NC}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}✓ Docker and Docker Compose are installed${NC}"
+}
+
+function start_logs() {
+    echo -e "${GREEN}Following logs... (Ctrl+C to stop)${NC}"
+    docker-compose logs -f --tail ${TAIL:-10}
+}
+
+function web_start() {
+    print_header
+    check_prerequisites
+    
+    echo -e "${YELLOW}Starting all agents and controllers...${NC}"
+    
+    # 設定環境變數
+    export RUNMODE="docker"
+    
+    # Ledger URL - 使用 host.docker.internal 連接到主機上的 Ledger
+    if [ -z "$LEDGER_URL" ]; then
+        export LEDGER_URL="http://host.docker.internal:9000"
+        echo -e "${YELLOW}Using default LEDGER_URL: ${LEDGER_URL}${NC}"
+    else
+        echo -e "${GREEN}Using LEDGER_URL: ${LEDGER_URL}${NC}"
+    fi
+    
+    export GENESIS_URL="${LEDGER_URL}/genesis"
+    
+    echo ""
+    echo -e "${YELLOW}Environment:${NC}"
+    echo "  RUNMODE: ${RUNMODE}"
+    echo "  LEDGER_URL: ${LEDGER_URL}"
+    echo "  GENESIS_URL: ${GENESIS_URL}"
+    echo ""
+    
+    # 啟動服務
+    echo -e "${YELLOW}Starting Docker Compose services...${NC}"
+    docker-compose up -d --build
+    
+    # 等待服務啟動
+    echo -e "${YELLOW}Waiting for services to start...${NC}"
+    sleep 5
+    
+    # 檢查服務狀態
+    echo ""
+    echo -e "${GREEN}Service Status:${NC}"
+    docker-compose ps
+    
+    echo ""
+    echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║  Services started successfully! 🎉                         ║${NC}"
+    echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}Access the controllers:${NC}"
+    echo "  Faber Controller:  http://localhost:9021"
+    echo "  Alice Controller:  http://localhost:9031"
+    echo "  Acme Controller:   http://localhost:9041"
+    echo ""
+    echo -e "${YELLOW}Agent Admin APIs (Swagger UI):${NC}"
+    echo "  Faber Agent:  http://localhost:8121"
+    echo "  Alice Agent:  http://localhost:8031"
+    echo "  Acme Agent:   http://localhost:8041"
+    echo ""
+    echo -e "${YELLOW}Quick Test:${NC}"
+    echo "  curl http://localhost:9021/api/status"
+    echo "  curl http://localhost:9031/api/status"
+    echo "  curl http://localhost:9041/api/status"
+    echo ""
+    
+    if [ "$LOGS" ]; then
+        start_logs
+    else
+        echo -e "${YELLOW}To view logs, run:${NC}"
+        echo "  ./run_demo logs"
+        echo ""
+        echo -e "${YELLOW}To stop all services, run:${NC}"
+        echo "  ./run_demo stop"
+    fi
+    
+    exit 0
+}
+
+function web_down() {
+    echo -e "${YELLOW}Stopping all services...${NC}"
+    docker-compose down
+    echo -e "${GREEN}✓ All services stopped${NC}"
+    exit 0
+}
+
+function build() {
+    echo -e "${YELLOW}Building all services with --no-cache...${NC}"
+    docker-compose build --no-cache
+    echo -e "${GREEN}✓ Build completed${NC}"
+    exit $?
+}
+
+function clean() {
+    echo -e "${YELLOW}Cleaning up Docker resources...${NC}"
+    docker-compose down -v --remove-orphans
+    echo -e "${GREEN}✓ Cleanup completed${NC}"
+    exit 0
+}
+
+function display_help() {
+    help="$(basename "$0") [command] [options]
+
+Commands:
+    start       Start all agents and controllers (default)
+    stop        Stop all services
+    logs        Follow logs from all services
+    build       Build all services with --no-cache
+    clean       Stop and remove all containers, volumes, and networks
+    help        Display this help message
+
+Options:
+    -l, --logs  Follow logs after starting services
+
+Examples:
+    ./run_demo start
+    ./run_demo start --logs
+    ./run_demo logs
+    ./run_demo stop
+    ./run_demo build
+    ./run_demo clean
+
+Environment Variables:
+    LEDGER_URL  URL of the Indy ledger (default: http://host.docker.internal:9000)
+    TAIL        Number of log lines to show initially (default: 10)
+
+Demo Workflow:
+    1. Start the demo: ./run_demo start
+    2. Open Faber: http://localhost:9021
+    3. Create invitation in Faber
+    4. Open Alice: http://localhost:9031
+    5. Accept invitation in Alice
+    6. Issue credential from Faber to Alice
+    7. Open Acme: http://localhost:9041
+    8. Connect Alice to Acme
+    9. Request proof from Acme to Alice
+    10. Alice provides proof, Acme verifies
+"
+    echo "$help"
+}
+
+# 解析命令行參數
+shopt -s nocasematch
+
+cd $(dirname $0)
+
+COMMAND=""
+LOGS=""
+
+for i in "$@"
+do
+    case $i in
+    -h|--help|help)
+        display_help
+        exit 0
+    ;;
+    -l|--logs)
+        LOGS=1
+    ;;
+    start|webstart)
+        COMMAND="start"
+    ;;
+    stop|webdown|down)
+        COMMAND="stop"
+    ;;
+    build)
+        COMMAND="build"
+    ;;
+    logs)
+        COMMAND="logs"
+    ;;
+    clean)
+        COMMAND="clean"
+    ;;
+    esac
+done
+
+# 如果沒有指定命令，預設為 start
+if [ -z "$COMMAND" ]; then
+    COMMAND="start"
+fi
+
+# 執行命令
+case $COMMAND in
+    start)
+        web_start
+    ;;
+    stop)
+        web_down
+    ;;
+    build)
+        build
+    ;;
+    logs)
+        start_logs
+        exit 0
+    ;;
+    clean)
+        clean
+    ;;
+    *)
+        display_help
+        exit 1
+    ;;
+esac

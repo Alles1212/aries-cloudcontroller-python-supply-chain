@@ -1,163 +1,385 @@
-<p align="center">
-  <br />
-  <img
-    alt="Hyperledger Aries logo"
-    src="https://raw.githubusercontent.com/didx-xyz/aries-cloudcontroller-python/main/assets/aries-logo.png"
-    height="250px"
-  />
-</p>
-<h1 align="center"><b>Aries CloudController Python</b></h1>
-<p align="center">
-  <a href="https://pypi.org/project/aries-cloudcontroller/">
-    <img alt="aries-cloudcontroller version" src="https://badge.fury.io/py/aries-cloudcontroller.svg"/>
-  </a>
-  <a
-    href="https://raw.githubusercontent.com/didx-xyz/aries-cloudcontroller-python/main/LICENSE"
-    ><img
-      alt="License"
-      src="https://img.shields.io/badge/License-Apache%202.0-blue.svg"
-  /></a>
-  <a href="https://www.python.org/"
-    ><img
-      alt="Python"
-      src="https://img.shields.io/badge/%3C%2F%3E-Python-%230074c1.svg"
-  /></a>
-</p>
-<br />
+# Aries CloudController Python — SSI Supply Chain Demo
 
-<p align="center">
-  <a href="#features">Features</a> &nbsp;|&nbsp;
-  <a href="#usage">Usage</a> &nbsp;|&nbsp;
-  <a href="#available-apis">Available APIs</a> &nbsp;|&nbsp;
-  <a href="#contributing">Contributing</a> &nbsp;|&nbsp;
-  <a href="#license">License</a>
-</p>
+A Self-Sovereign Identity (SSI) supply chain demo built with **Hyperledger Aries**, **Aries Cloud Agent - Python (ACA-Py)**, **aries-cloudcontroller-python**, and **VON Network**. This repository implements a three-party flow: **Faber** (Issuer), **Alice** (Holder), and **Acme** (Verifier), with type-safe Python controllers using FastAPI and the aries-cloudcontroller client.
 
-The Aries CloudController is a Python-based client library for interacting with an instance of
-[Aries Cloud Agent](https://github.com/hyperledger/aries-cloudagent-python) (ACA-Py). It leverages
-the OpenAPI definition from ACA-Py to provide a fully-typed, rich API experience for cloud agent interaction.
+---
 
-**Versioning Update:**
-As of version 0.8.0, the Aries CloudController has aligned its versioning with ACA-Py.
-This means that each new version of ACA-Py will correspond directly to the same version of the
-Aries CloudController. This change ensures a more straightforward and predictable upgrade path for users.
+## Table of Contents
 
-In other words, CloudController 0.8.0 is compatible with ACA-Py 0.8.0,
-CloudController 0.9.0 is compatible with ACA-Py 0.9.0, etc.
+- [Technology Stack](#technology-stack)
+- [System Architecture](#system-architecture)
+- [Supply Chain Roles: Issuer, Holder, Verifier](#supply-chain-roles-issuer-holder-verifier)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Usage & Workflow](#usage--workflow)
+- [Guidelines](#guidelines)
+- [API Endpoints](#api-endpoints)
+- [Project Structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+- [References](#references)
 
-For legacy versions, please review our release history to found the version compatible with ACA-Py pre-0.8.0.
+---
 
-## Features
+## Technology Stack
 
-Aries CloudController Python provides a robust client for interacting with Aries Cloud Agents (ACA-Py).
+| Component | Description |
+|-----------|-------------|
+| **Hyperledger Aries** | Framework for decentralized identity and verifiable credentials (DIDComm, protocols). |
+| **ACA-Py** | Aries Cloud Agent - Python; implements Aries protocols and talks to the ledger. |
+| **aries-cloudcontroller-python** | Type-safe Python client for ACA-Py Admin API (OpenAPI-generated). |
+| **VON Network** | Verifiable Organizations Network; Indy-based ledger for schemas and credential definitions. |
+| **FastAPI** | Web framework for the three controllers (Faber, Alice, Acme). |
+| **React (Vite)** | Frontend for each controller. |
 
-- **Fully Typed**: Offers a strongly-typed wrapper around the Aries Cloud Agent Python,
-  enhancing developer experience and reducing errors.
-- **Up-to-Date Support**: Compatible with the latest ACA-Py version (1.1.0),
-  ensuring access to the most recent features and improvements.
-- **Auto-Generated Client**: Utilizes OpenAPI definitions for automatic generation,
-  ensuring timely updates in line with new ACA-Py releases.
-- **Multi-Tenancy and Authentication Support**: Facilitates working with multi-tenant APIs
-  and integrates various authentication mechanisms.
-- **Asynchronous API**: Supports asynchronous operations, enabling efficient handling of I/O-bound tasks.
+---
 
-## Usage
+## System Architecture
 
-Install Aries Cloud Controller Python via pip:
+High-level architecture: Controllers use aries-cloudcontroller-python to call ACA-Py agents; agents use the Indy ledger (VON Network) for schemas and credential definitions.
 
-```sh
-pip install aries-cloudcontroller
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           User / Browser (React UI)                               │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐                 │
+│  │ Faber Controller│  │ Alice Controller│  │ Acme Controller  │                 │
+│  │   (Issuer UI)   │  │  (Holder UI)    │  │ (Verifier UI)    │                 │
+│  │   :9021         │  │   :9031         │  │   :9041         │                 │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘                 │
+└────────────┼───────────────────┼─────────────────────┼──────────────────────────┘
+             │                   │                     │
+             │    aries-cloudcontroller-python          │
+             │    (typed client → ACA-Py Admin API)     │
+             │                   │                     │
+┌────────────▼───────────────────▼─────────────────────▼──────────────────────────┐
+│                         Python Controllers (FastAPI)                              │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐                 │
+│  │ Faber           │  │ Alice           │  │ Acme            │                 │
+│  │ routes:         │  │ routes:         │  │ routes:         │                 │
+│  │ connections,    │  │ connections,    │  │ connections,    │                 │
+│  │ schemas,        │  │ credentials,    │  │ credentials,    │                 │
+│  │ cred defs,      │  │ proofs          │  │ schemas,        │                 │
+│  │ credentials     │  │                 │  │ cred defs,      │                 │
+│  └────────┬────────┘  └────────┬────────┘  │ proofs          │                 │
+│           │                   │            └────────┬────────┘                 │
+└───────────┼───────────────────┼─────────────────────┼──────────────────────────┘
+            │                   │                     │
+            │         ACA-Py Admin API (HTTP)        │
+            │                   │                     │
+┌───────────▼───────────────────▼─────────────────────▼──────────────────────────┐
+│                      Aries Cloud Agent - Python (ACA-Py)                        │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐                 │
+│  │ Faber Agent     │  │ Alice Agent     │  │ Acme Agent      │                 │
+│  │ :8120 (admin)   │  │ :8030 (admin)   │  │ :8040 (admin)   │                 │
+│  │ DIDComm,        │  │ DIDComm,        │  │ DIDComm,        │                 │
+│  │ Issue Cred v2   │  │ Hold credentials│  │ Request/Verify  │                 │
+│  │ Publish Schema  │  │ Present Proof   │  │ Proof           │                 │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘                 │
+└───────────┼───────────────────┼─────────────────────┼──────────────────────────┘
+            │                   │                     │
+            │    Indy Protocol (read/write ledger)    │
+            │                   │                     │
+┌───────────▼───────────────────▼─────────────────────▼──────────────────────────┐
+│                         VON Network (Indy Ledger)                               │
+│  http://localhost:9000                                                          │
+│  • Schemas (write by Issuer)                                                    │
+│  • Credential Definitions (write by Issuer)                                     │
+│  • Ledger explorer UI                                                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Creating a Client
+Data flow summary:
 
-Easily initialize the AcaPyClient:
+1. **Browser** → **Controller** (FastAPI): REST API and static React app.
+2. **Controller** → **ACA-Py**: aries-cloudcontroller-python calls Agent Admin API.
+3. **ACA-Py** ↔ **VON Network**: read/write schemas, credential definitions; DID and key material.
 
-```python
-from aries_cloudcontroller import AcaPyClient
+---
 
-client = AcaPyClient(
-    base_url="http://localhost:8000",
-    api_key="myApiKey"
-)
+## Supply Chain Roles: Issuer, Holder, Verifier
+
+In this demo, the three roles map to a simple supply chain: Issuer (Faber) issues credentials, Holder (Alice) stores and presents them, Verifier (Acme) requests and verifies proofs.
+
+```
+                    ┌──────────────────────────────────────────────────────────┐
+                    │              SSI Supply Chain (Aries Flow)                 │
+                    └──────────────────────────────────────────────────────────┘
+
+     ┌─────────────────────┐         ┌─────────────────────┐         ┌─────────────────────┐
+     │       FABER         │         │       ALICE         │         │       ACME          │
+     │      (Issuer)       │         │      (Holder)       │         │     (Verifier)       │
+     ├─────────────────────┤         ├─────────────────────┤         ├─────────────────────┤
+     │ • Create Schema     │         │ • Store credentials │         │ • Request proof     │
+     │ • Create Cred Def   │         │ • Present proof     │         │ • Verify proof      │
+     │ • Issue credentials │         │ • Manage connections│         │ • View schemas/     │
+     │ • Revoke (optional) │         │                     │         │   cred defs (read)  │
+     │ • Manage connections│         │                     │         │ • Manage connections│
+     └──────────┬──────────┘         └──────────┬──────────┘         └──────────┬──────────┘
+                │                               │                               │
+                │  1. Connection (OOB invite)   │  2. Connection (OOB invite)   │
+                │─────────────────────────────►│◄─────────────────────────────►│
+                │                               │                               │
+                │  3. Issue credential          │  4. Present proof              │
+                │     (offer → request →        │     (request → presentation   │
+                │      issue)                   │      → verify)                 │
+                │─────────────────────────────►│───────────────────────────────►│
+                │                               │                               │
+                │  Ledger: Schema, Cred Def     │  Ledger: read-only            │
+                │  (Faber writes)               │  (Alice does not write)       │
+                ▼                               ▼                               ▼
+     ┌─────────────────────────────────────────────────────────────────────────────────┐
+     │                          VON Network (Indy Ledger)                               │
+     │  Schemas, Credential Definitions, DIDs                                          │
+     └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Admin Insecure Mode**: If running ACA-Py with the `--admin-insecure-mode` flag and without an API key:
+| Role    | Party | Responsibility |
+|---------|-------|----------------|
+| Issuer  | Faber | Publish schemas and credential definitions to the ledger; issue credentials to Alice. |
+| Holder  | Alice | Receive and store credentials; present proofs to Acme when requested. |
+| Verifier| Acme  | Send proof requests; verify presentations (and optionally read schemas/cred defs from ledger). |
 
-```python
-client = AcaPyClient(
-    base_url="http://localhost:8000",
-    admin_insecure=True  # No API key needed
-)
+---
+
+## Prerequisites
+
+- **Docker** and **Docker Compose**
+- **VON Network** (Indy ledger) running, e.g. at `http://localhost:9000`
+
+To start VON Network (if not already running):
+
+```bash
+git clone https://github.com/bcgov/von-network.git
+cd von-network
+./manage build
+./manage start
+# Ledger UI: http://localhost:9000
 ```
 
-**Multitenancy**: For specific tenant contexts:
+---
 
-```python
-client = AcaPyClient(
-    base_url="http://localhost:8000",
-    tenant_jwt="eyXXX"
-)
+## Quick Start
+
+1. **Set ledger URL** (if not using default):
+
+   ```bash
+   export LEDGER_URL="http://host.docker.internal:9000"
+   export GENESIS_URL="${LEDGER_URL}/genesis"
+   ```
+
+2. **Start all services** (agents + controllers):
+
+   ```bash
+   ./run_demo start
+   # Or with logs: ./run_demo start --logs
+   ```
+
+3. **Verify**:
+
+   ```bash
+   curl -s http://localhost:9021/api/status   # Faber
+   curl -s http://localhost:9031/api/status   # Alice
+   curl -s http://localhost:9041/api/status   # Acme
+   # Each should return: {"status":"up"}
+   ```
+
+4. **Open UIs**:
+
+   - Faber Controller (Issuer): http://localhost:9021  
+   - Alice Controller (Holder): http://localhost:9031  
+   - Acme Controller (Verifier): http://localhost:9041  
+
+   Agent Admin (Swagger) optional:
+
+   - Faber Agent: http://localhost:8120  
+   - Alice Agent: http://localhost:8030  
+   - Acme Agent: http://localhost:8040  
+
+---
+
+## Usage & Workflow
+
+### 1. Faber ↔ Alice: connection
+
+1. **Faber** (http://localhost:9021): Connections → **Create Invitation** → copy the invitation JSON.
+2. **Alice** (http://localhost:9031): Connections → **Accept Invitation** → paste JSON → submit.
+3. On both UIs, the connection should show as **active**.
+
+### 2. Faber issues a credential to Alice
+
+1. **Faber**: Ensure a schema and credential definition exist (Schemas → Create Schema if needed; Credential Definitions lists cred defs).
+2. **Faber**: Credential Definitions → **Send Credential** → choose Alice’s connection → fill attributes → send.
+3. **Alice**: Credentials → see the new credential exchange; accept/store as needed.
+
+### 3. Alice ↔ Acme: connection
+
+1. **Alice**: Connections → Create Invitation → copy JSON.
+2. **Acme** (http://localhost:9041): Connections → Accept Invitation → paste JSON → submit.
+3. Both sides should show the connection as **active**.
+
+### 4. Acme requests proof, Alice presents
+
+1. **Acme**: Proofs → **Send Proof Request** → choose Alice’s connection → enter Credential Definition ID (from Faber’s Credential Definitions) → optionally add predicates (e.g. range proof) → send.
+2. **Alice**: Proofs → see the request → **Send Proof** (choose credential and send presentation).
+3. **Acme**: Proofs → verify the presentation; status should become **verified**.
+
+---
+
+## Guidelines
+
+- **Ledger**: Ensure VON Network is up and reachable at `LEDGER_URL` (e.g. `http://host.docker.internal:9000` from containers).
+- **Ports**: Avoid conflicts with 9021, 9031, 9041 (controllers) and 8120, 8030, 8040 (agents); 9000 for VON.
+- **Credentials**: Issuer (Faber) must have a schema and credential definition on the ledger before issuing; Verifier (Acme) needs the correct Credential Definition ID when sending proof requests.
+- **Predicates**: For range proofs (e.g. age ≥ 18), use numeric attribute names and values; predicates are sent in the proof request and verified by Acme.
+- **Revocation**: Supported only if the credential definition was created with `support_revocation: true`; use the revoke endpoint with `rev_reg_id` and `cred_rev_id`.
+
+---
+
+## API Endpoints
+
+Base URLs (host):
+
+- Faber Controller: `http://localhost:9021`
+- Alice Controller: `http://localhost:9031`
+- Acme Controller: `http://localhost:9041`
+
+All controller routes below are prefixed with `/api` (e.g. Faber: `http://localhost:9021/api/...`).
+
+---
+
+### Faber Controller (Issuer)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/status` | Controller/agent health. |
+| GET | `/api/connections` | List connections. |
+| POST | `/api/connections/invitation` | Create out-of-band invitation. |
+| POST | `/api/connections/accept` | Accept invitation (body: invitation JSON). |
+| DELETE | `/api/connections/{connection_id}` | Remove connection. |
+| GET | `/api/schemas` | List created schema IDs. |
+| GET | `/api/schemas/{schema_id}` | Get schema by ID (path). |
+| POST | `/api/admin/schema` | Create schema and credential definition (body: schema_name, schema_version, attributes, tag, support_revocation). |
+| GET | `/api/credential-definitions` | List created credential definition IDs. |
+| GET | `/api/credential-definitions/{cred_def_id}` | Get credential definition by ID (path). |
+| POST | `/api/credentials/send` | Send credential offer (body: connection_id, cred_def_id, attributes, etc.). |
+| GET | `/api/credential-exchanges` | List credential exchange records. |
+| POST | `/api/credentials/revoke` | Revoke credential (body: cred_ex_id, rev_reg_id, cred_rev_id, publish). |
+
+---
+
+### Alice Controller (Holder)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/status` | Controller/agent health. |
+| GET | `/api/connections` | List connections. |
+| POST | `/api/connections/invitation` | Create invitation. |
+| POST | `/api/connections/accept` | Accept invitation. |
+| DELETE | `/api/connections/{connection_id}` | Remove connection. |
+| GET | `/api/credentials` | List stored credentials. |
+| GET | `/api/credential-exchanges` | List credential exchange records. |
+| POST | `/api/credential-exchanges/{cred_ex_id}/request` | Send credential request (after offer). |
+| POST | `/api/credential-exchanges/{cred_ex_id}/store` | Store issued credential. |
+| GET | `/api/proofs` | List proof exchange records. |
+| POST | `/api/proofs/{pres_ex_id}/send` | Send presentation (respond to proof request). |
+| GET | `/api/proofs/{pres_ex_id}/credentials` | Get credentials available for a proof request. |
+
+---
+
+### Acme Controller (Verifier)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/status` | Controller/agent health. |
+| GET | `/api/connections` | List connections. |
+| POST | `/api/connections/invitation` | Create invitation. |
+| POST | `/api/connections/accept` | Accept invitation. |
+| DELETE | `/api/connections/{connection_id}` | Remove connection. |
+| GET | `/api/credentials` | List stored credentials (if any). |
+| GET | `/api/credential-exchanges` | List credential exchange records. |
+| GET | `/api/schemas` | List schema IDs (from ledger). |
+| GET | `/api/schemas/{schema_id}` | Get schema by ID (path). |
+| GET | `/api/credential-definitions` | List credential definition IDs. |
+| GET | `/api/credential-definitions/{cred_def_id}` | Get credential definition by ID (path). |
+| GET | `/api/proofs` | List proof exchange records. |
+| POST | `/api/proofs/send-request` | Send proof request (body: connection_id, presentation_request with indy request, optional comment). |
+| POST | `/api/proofs/{pres_ex_id}/verify` | Verify presentation. |
+| GET | `/api/proofs/{pres_ex_id}` | Get proof exchange by ID. |
+
+---
+
+## Project Structure
+
+```
+.
+├── faber-controller-python/     # Issuer controller
+│   ├── main.py
+│   ├── config.py
+│   ├── routes/
+│   │   ├── connections.py
+│   │   ├── schemas.py
+│   │   ├── credential_definitions.py
+│   │   └── credentials.py
+│   ├── client/                  # React (Vite) UI
+│   └── requirements.txt
+├── alice-controller-python/     # Holder controller
+│   ├── main.py
+│   ├── config.py
+│   ├── routes/
+│   │   ├── connections.py
+│   │   ├── credentials.py
+│   │   └── proofs.py
+│   ├── client/
+│   └── requirements.txt
+├── acme-controller-python/      # Verifier controller
+│   ├── main.py
+│   ├── config.py
+│   ├── routes/
+│   │   ├── connections.py
+│   │   ├── credentials.py
+│   │   ├── schemas.py
+│   │   ├── credential_definitions.py
+│   │   └── proofs.py
+│   ├── client/
+│   └── requirements.txt
+├── aries_cloudcontroller/       # aries-cloudcontroller-python client
+├── docker-compose.yml
+├── run_demo                     # Start/stop script
+└── README.md
 ```
 
-### Interacting with the Client
+---
 
-The API, being fully typed, is best explored through the ACA-Py Swagger UI,
-which mirrors the available client properties.
+## Troubleshooting
 
-**Example**: Creating and receiving an invitation:
+| Issue | Check |
+|-------|--------|
+| Agent cannot reach ledger | Ensure VON Network is running at `LEDGER_URL`; from host use `http://localhost:9000`, from containers use `http://host.docker.internal:9000`. |
+| Controller returns `{"status":"down"}` | Confirm the corresponding agent container is up; check `docker-compose ps` and agent logs. |
+| Credential or proof flow fails | Verify connections are **active** on both sides; confirm schema and credential definition exist on the ledger and Credential Definition ID is correct for proof requests. |
+| Port already in use | Change controller/agent port mapping in `docker-compose.yml` or stop the conflicting process. |
 
-```python
-invitation = await client.connection.create_invitation(
-    body=CreateInvitationRequest(my_label="Cloud Controller")
-)
+Useful commands:
 
-connection = await client.connection.receive_invitation(body=invitation.invitation)
+```bash
+docker-compose ps
+docker-compose logs faber-controller
+docker-compose logs faber-agent
+./run_demo stop
+./run_demo start
 ```
 
-## Available APIs
+---
 
-The client encompasses various APIs, each corresponding to ACA-Py Swagger UI topics:
+## References
 
-- `action_menu`
-- `anoncreds_credential_definitions`
-- `anoncreds_revocation`
-- `anoncreds_schemas`
-- `anoncreds_wallet_upgrade`
-- `basicmessage`
-- `connection`
-- `credential_definition`
-- `credentials`
-- `default`
-- `did_exchange`
-- `did_rotate`
-- `discover_features`
-- `discover_features_v2_0`
-- `endorse_transaction`
-- `introduction`
-- `issue_credential_v1_0`
-- `issue_credential_v2_0`
-- `jsonld`
-- `ledger`
-- `mediation`
-- `multitenancy`
-- `out_of_band`
-- `present_proof_v1_0`
-- `present_proof_v2_0`
-- `resolver`
-- `revocation`
-- `schema`
-- `server`
-- `settings`
-- `trustping`
-- `vc`
-- `wallet`
+- [Hyperledger Aries](https://www.hyperledger.org/use/aries)
+- [Aries Cloud Agent - Python (ACA-Py)](https://aca-py.org/)
+- [aries-cloudcontroller-python](https://github.com/didx-xyz/aries-cloudcontroller-python)
+- [VON Network](https://github.com/bcgov/von-network)
+- [Indy Ledger](https://wiki.hyperledger.org/display/indy)
 
-## Contributing
-
-Contributions are welcome! Please see our [CONTRIBUTING](/CONTRIBUTING.md) guidelines
-for more information on how to get involved.
+---
 
 ## License
 
-This project is licensed under the [Apache License Version 2.0 (Apache-2.0)](/LICENSE).
+Apache-2.0

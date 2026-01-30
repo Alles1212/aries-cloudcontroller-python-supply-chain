@@ -1,0 +1,125 @@
+version: '3'
+
+services:
+    # ============================================
+    # ACA-Py Agents
+    # ============================================
+    
+    faber-agent:
+        platform: linux/amd64
+        command: ['faber --port 8020 --aip 20']
+        build:
+            context: https://github.com/hyperledger/aries-cloudagent-python.git#main
+            dockerfile: ./docker/Dockerfile.demo
+        ports:
+            - 8120-8127:8020-8027
+        networks:
+            - aca
+        environment:
+            RUNMODE: ${RUNMODE}
+            DOCKERHOST: faber-agent
+            LEDGER_URL: ${LEDGER_URL}
+            GENESIS_URL: ${GENESIS_URL}
+            AGENT_ENDPOINT: http://host.docker.internal:8120
+        tty: true
+
+    alice-agent:
+        platform: linux/amd64
+        command: ['alice --port 8030 --aip 20']
+        build:
+            context: https://github.com/hyperledger/aries-cloudagent-python.git#main
+            dockerfile: ./docker/Dockerfile.demo
+        ports:
+            - 8030-8037:8030-8037
+        networks:
+            - aca
+        environment:
+            RUNMODE: ${RUNMODE}
+            DOCKERHOST: alice-agent
+            LEDGER_URL: ${LEDGER_URL}
+            GENESIS_URL: ${GENESIS_URL}
+            AGENT_ENDPOINT: http://host.docker.internal:8030
+        tty: true
+
+    acme-agent:
+        platform: linux/amd64
+        command: ['acme --port 8040 --aip 20']
+        build:
+            context: https://github.com/hyperledger/aries-cloudagent-python.git#main
+            dockerfile: ./docker/Dockerfile.demo
+        ports:
+            - 8040-8047:8040-8047
+        networks:
+            - aca
+        environment:
+            RUNMODE: ${RUNMODE}
+            DOCKERHOST: acme-agent
+            LEDGER_URL: ${LEDGER_URL}
+            GENESIS_URL: ${GENESIS_URL}
+            AGENT_ENDPOINT: http://host.docker.internal:8040
+        tty: true
+
+    # ============================================
+    # Python Controllers
+    # ============================================
+
+    faber-controller:
+        build:
+            context: ./faber-controller-python
+        ports:
+            - 9021:3000
+        networks:
+            - aca
+        depends_on:
+            - faber-agent
+        environment:
+            - RUNMODE=${RUNMODE}
+            - FABER_AGENT_HOST=faber-agent
+            - FABER_AGENT_PORT=8021
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+
+    alice-controller:
+        build:
+            context: ./alice-controller-python
+        ports:
+            - 9031:3000
+        networks:
+            - aca
+        depends_on:
+            - alice-agent
+        environment:
+            - RUNMODE=${RUNMODE}
+            - ALICE_AGENT_HOST=alice-agent
+            - ALICE_AGENT_PORT=8031
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+
+    acme-controller:
+        build:
+            context: ./acme-controller-python
+        ports:
+            - 9041:3000
+        networks:
+            - aca
+        depends_on:
+            - acme-agent
+        environment:
+            - RUNMODE=${RUNMODE}
+            - ACME_AGENT_HOST=acme-agent
+            - ACME_AGENT_PORT=8041
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+
+networks:
+    aca:
+        driver: bridge

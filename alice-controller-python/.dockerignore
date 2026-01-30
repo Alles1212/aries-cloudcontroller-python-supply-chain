@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+.DS_Store
+.git/
+.gitignore
+*.log
+# 排除前端構建產物和依賴
+client/node_modules/
+client/dist/
+client/.vite/
+client/.DS_Store

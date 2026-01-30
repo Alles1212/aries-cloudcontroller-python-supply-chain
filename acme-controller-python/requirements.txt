@@ -1,0 +1,8 @@
+# Acme Controller - Python Backend
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+aries-cloudcontroller>=1.1.0
+python-multipart==0.0.12
+python-dotenv==1.0.1
+pydantic-settings>=2.0.0
+aiohttp>=3.9.0

@@ -1,0 +1,19 @@
+# Faber Controller - Python Backend
+# 使用 aries-cloudcontroller-python 與 ACA-Py 互動
+
+# Web 框架
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+
+# ACA-Py 客戶端 (與您的 aries-cloudcontroller-python 版本對應)
+aries-cloudcontroller>=1.1.0
+
+# CORS 支援 (供 React 前端調用)
+python-multipart==0.0.12
+
+# 日誌與環境變數
+python-dotenv==1.0.1
+pydantic-settings>=2.0.0
+
+# HTTP 客戶端 (aries-cloudcontroller-python 依賴)
+aiohttp>=3.9.0
